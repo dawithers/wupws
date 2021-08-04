@@ -1,25 +1,24 @@
 #!/bin/bash
 
 ## JH: v1.0 - Weather Underground to pwsweather.com script test
-
-WORKINGDIR=/home/ABC123
+FILE=$(mktemp --suffix=.json)
 
 # Wunderground API key
 # Register for a free Stratus plan here: https://www.wunderground.com/weather/api
-WUAPI={your weather underground API key - no braces}
+WUAPI=$1
 
 # Wunderground PWS to pull weather from
 # Navigate to your preferred weather station on Weather Underground and pull the pws:XXXXXXXXXX from the URL
 # ex. https://www.wunderground.com/cgi-bin/findweather/getForecast?query=pws:KFLLAKEW61&MR=1
 # ex. WUPWS would be the query value - "pws:KFLLAKEW61"
 #WUPWS="pws:KFLLAKEW53"
-WUPWS={"your weather underground station identifier - no braces - yes quotes"}
+WUPWS="$2"
 
 #PWS station ID - sign up and create a station at pwsweather.com
-PWSID={your pwsweather.com station ID}
+PWSID=$2
 
 #PWS password - password for pwsweather.com
-PWSPASS={your pwsweather.com password}
+PWSPASS=$3
 
 #============================================================
 #=
@@ -28,82 +27,70 @@ PWSPASS={your pwsweather.com password}
 #============================================================
 
 # Construct & Execute Weather Underground API call
-WUJSON=http://api.wunderground.com/api/$WUAPI/conditions/q/$WUPWS\.json
+WUJSON="https://api.weather.com/v2/pws/observations/current?stationId=$WUPWS&format=json&units=e&apiKey=$WUAPI"
 echo "Grabbing JSON using the following URL: $WUJSON"
 echo ""
-wget -O $WORKINGDIR/wu.json $WUJSON
+wget -O $FILE $WUJSON
 
 # ALL json extractions below REQUIRE the jq cmd line tool - on Ubuntu 'apt-get install jq'
 #
 # extract observation time and convert to UTC
-# jq .current_observation.observation_epoch wu.json |tr -d '"'
+# jq .observations[].observation_epoch wu.json |tr -d '"'
 # TZ=UTC date -d @1459187921 +'%Y-%m-%d+%H:%M:%S'|sed 's/:/%3A/g'
-PWSDATEUTC=$(TZ=UTC date -d @$(jq .current_observation.observation_epoch $WORKINGDIR/wu.json |tr -d '"') +'%Y-%m-%d+%H:%M:%S'|sed 's/:/%3A/g')
+PWSDATEUTC=$(TZ=UTC date -d $(jq .observations[].obsTimeUtc $FILE |tr -d '"') +'%Y-%m-%d %H:%M:%S'|sed 's/:/%3A/g'|sed 's/ /%20/g')
 echo "PWSDATEUTC=$PWSDATEUTC"
 
 # extract winddir
-PWSWINDDIR=$(jq .current_observation.wind_degrees $WORKINGDIR/wu.json |tr -d '"')
+PWSWINDDIR=$(jq .observations[].winddir $FILE |tr -d '"')
 echo "PWSWINDDIR=$PWSWINDDIR"
 
 # extract windspeed
-PWSWINDSPEEDMPH=$(jq .current_observation.wind_mph $WORKINGDIR/wu.json |tr -d '"')
+PWSWINDSPEEDMPH=$(jq .observations[].imperial.windSpeed $FILE |tr -d '"')
 echo "PWSWINDSPEEDMPH=$PWSWINDSPEEDMPH"
 
 # extract windgustmph
-PWSWINDGUSTMPH=$(jq .current_observation.wind_gust_mph $WORKINGDIR/wu.json |tr -d '"')
+PWSWINDGUSTMPH=$(jq .observations[].imperial.windGust $FILE |tr -d '"')
 echo "PWSWINDGUSTMPH=$PWSWINDGUSTMPH"
 
 # extract tempf
-PWSTEMPF=$(jq .current_observation.temp_f $WORKINGDIR/wu.json |tr -d '"')
+PWSTEMPF=$(jq .observations[].imperial.temp $FILE |tr -d '"')
 echo "PWSTEMPF=$PWSTEMPF"
 
 # extract hourly rainin - Hourly rain in inches
-PWSRAININ=$(jq .current_observation.precip_1hr_in $WORKINGDIR/wu.json |tr -d '"')
+PWSRAININ=$(jq .observations[].imperial.precipRate $FILE |tr -d '"')
 echo "PWSRAININ=$PWSRAININ"
 
 
 # extract daily rainin - Daily rain in inches
-PWSDAILYRAININ=$(jq .current_observation.precip_today_in $WORKINGDIR/wu.json |tr -d '"')
+PWSDAILYRAININ=$(jq .observations[].imperial.precipTotal $FILE |tr -d '"')
 echo "PWSDAILYRAININ=$PWSDAILYRAININ"
 
 # extract baromin - Barometric pressure in inches
-PWSBAROMIN=$(jq .current_observation.pressure_in $WORKINGDIR/wu.json |tr -d '"')
+PWSBAROMIN=$(jq .observations[].imperial.pressure $FILE |tr -d '"')
 echo "PWSBAROMIN=$PWSBAROMIN"
 
 # extract dewptf - Dew point in degrees f
-PWSDEWPTF=$(jq .current_observation.dewpoint_f $WORKINGDIR/wu.json |tr -d '"')
+PWSDEWPTF=$(jq .observations[].imperial.dewpt $FILE |tr -d '"')
 echo "PWSDEWPTF=$PWSDEWPTF"
 
 # extract humidity - in percent
-PWSHUMIDITY=$(jq .current_observation.relative_humidity $WORKINGDIR/wu.json |tr -d '"' |tr -d '%')
+PWSHUMIDITY=$(jq .observations[].humidity $FILE |tr -d '"' |tr -d '%')
 echo "PWSHUMIDITY=$PWSHUMIDITY"
 
 # extract solarradiation
-PWSSOLARRADIATION=$(jq .current_observation.solarradiation $WORKINGDIR/wu.json |tr -d '"'|tr -d '-')
+PWSSOLARRADIATION=$(jq .observations[].solarRadiation $FILE |tr -d '"'|tr -d '-')
 echo "PWSSOLARRADIATION=$PWSSOLARRADIATION"
 
 # extract UV
-PWSUV=$(jq .current_observation.UV $WORKINGDIR/wu.json |tr -d '"')
+PWSUV=$(jq .observations[].uv $FILE |tr -d '"')
 echo "PWSUV=$PWSUV"
 
 # construct PWS weather POST data string
 
-PWSPOST="ID=$PWSID&PASSWORD=$PWSPASS&dateutc=$PWSDATEUTC&winddir=$PWSWINDDIR&windspeedmph=$PWSWINDSPEEDMPH&windgustmph=$PWSWINDGUSTMPH&tempf=$PWSTEMPF&rainin=$PWSRAININ&dailyrainin=$PWSDAILYRAININ&baromin=$PWSBAROMIN&dewptf=$PWSDEWPTF&humidity=$PWSHUMIDITY&solarradiation=$PWSSOLARRADIATION&UV=$PWSUV&softwaretype=wu_pws_ver1.0&action=updateraw"
+PWSPOST="ID=$PWSID&PASSWORD=$PWSPASS&dateutc=$PWSDATEUTC&winddir=$PWSWINDDIR&windspeedmph=$PWSWINDSPEEDMPH&windgustmph=$PWSWINDGUSTMPH&tempf=$PWSTEMPF&rainin=$PWSRAININ&dailyrainin=$PWSDAILYRAININ&baromin=$PWSBAROMIN&dewptf=$PWSDEWPTF&humidity=$PWSHUMIDITY&solarradiation=$PWSSOLARRADIATION&UV=$PWSUV&action=updateraw"
 #echo $PWSPOST
 
-RESULT=$(wget -O /dev/null --post-data=$PWSPOST http://www.pwsweather.com/pwsupdate/pwsupdate.php)
-echo wget -O /dev/null --post-data=$PWSPOST http://www.pwsweather.com/pwsupdate/pwsupdate.php
+RESULT=$(wget -O /dev/null --post-data=$PWSPOST https://www.pwsweather.com/pwsupdate/pwsupdate.php)
+echo wget -O /dev/null --post-data=$PWSPOST https://www.pwsweather.com/pwsupdate/pwsupdate.php
 
-# retains 10 backup cycles for debugging
-rm $WORKINGDIR/wu.json.10
-mv $WORKINGDIR/wu.json.9 $WORKINGDIR/wu.json.10
-mv $WORKINGDIR/wu.json.8 $WORKINGDIR/wu.json.9
-mv $WORKINGDIR/wu.json.7 $WORKINGDIR/wu.json.8
-mv $WORKINGDIR/wu.json.6 $WORKINGDIR/wu.json.7
-mv $WORKINGDIR/wu.json.5 $WORKINGDIR/wu.json.6
-mv $WORKINGDIR/wu.json.4 $WORKINGDIR/wu.json.5
-mv $WORKINGDIR/wu.json.3 $WORKINGDIR/wu.json.4
-mv $WORKINGDIR/wu.json.2 $WORKINGDIR/wu.json.3
-mv $WORKINGDIR/wu.json.1 $WORKINGDIR/wu.json.2
-mv $WORKINGDIR/wu.json $WORKINGDIR/wu.json.1
-
+rm $FILE
