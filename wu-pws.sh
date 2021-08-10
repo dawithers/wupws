@@ -43,14 +43,32 @@ echo "PWSDATEUTC=$PWSDATEUTC"
 # extract winddir
 PWSWINDDIR=$(jq .observations[].winddir $FILE |tr -d '"')
 echo "PWSWINDDIR=$PWSWINDDIR"
+if [[ $PWSWINDDIR != "null" ]]
+then
+  PWSWINDDIR="&winddir=$PWSWINDDIR"
+else
+  PWSWINDDIR=""
+fi
 
 # extract windspeed
 PWSWINDSPEEDMPH=$(jq .observations[].imperial.windSpeed $FILE |tr -d '"')
 echo "PWSWINDSPEEDMPH=$PWSWINDSPEEDMPH"
+if [[ $PWSWINDSPEEDMPH != "null" ]]
+then
+  PWSWINDSPEEDMPH="&windspeedmph=$PWSWINDSPEEDMPH"
+else
+  PWSWINDSPEEDMPH=""
+fi
 
 # extract windgustmph
 PWSWINDGUSTMPH=$(jq .observations[].imperial.windGust $FILE |tr -d '"')
 echo "PWSWINDGUSTMPH=$PWSWINDGUSTMPH"
+if [[ $PWSWINDGUSTMPH != "null" ]]
+then
+  PWSWINDGUSTMPH="&windgustmph=$PWSWINDGUSTMPH"
+else
+  PWSWINDGUSTMPH=""
+fi
 
 # extract tempf
 PWSTEMPF=$(jq .observations[].imperial.temp $FILE |tr -d '"')
@@ -80,14 +98,26 @@ echo "PWSHUMIDITY=$PWSHUMIDITY"
 # extract solarradiation
 PWSSOLARRADIATION=$(jq .observations[].solarRadiation $FILE |tr -d '"'|tr -d '-')
 echo "PWSSOLARRADIATION=$PWSSOLARRADIATION"
+if [[ $PWSSOLARRADIATION != "null" ]]
+then
+  PWSSOLARRADIATION="&solarradiation=$PWSSOLARRADIATION"
+else
+  PWSSOLARRADIATION=""
+fi
 
 # extract UV
 PWSUV=$(jq .observations[].uv $FILE |tr -d '"')
 echo "PWSUV=$PWSUV"
+if [[ $PWSUV != "null" ]]
+then
+  PWSUV="&uv=$PWSUV"
+else
+  PWSUV=""
+fi
 
 # construct PWS weather POST data string
 
-PWSPOST="ID=$PWSID&PASSWORD=$PWSPASS&dateutc=$PWSDATEUTC&winddir=$PWSWINDDIR&windspeedmph=$PWSWINDSPEEDMPH&windgustmph=$PWSWINDGUSTMPH&tempf=$PWSTEMPF&rainin=$PWSRAININ&dailyrainin=$PWSDAILYRAININ&baromin=$PWSBAROMIN&dewptf=$PWSDEWPTF&humidity=$PWSHUMIDITY&solarradiation=$PWSSOLARRADIATION&UV=$PWSUV&action=updateraw"
+PWSPOST="ID=$PWSID&PASSWORD=$PWSPASS&dateutc=${PWSDATEUTC}${PWSWINDDIR}${PWSWINDSPEEDMPH}${PWSWINDGUSTMPH}&tempf=$PWSTEMPF&rainin=$PWSRAININ&dailyrainin=$PWSDAILYRAININ&baromin=$PWSBAROMIN&dewptf=$PWSDEWPTF&humidity=${PWSHUMIDITY}${PWSSOLARRADIATION}${PWSUV}&action=updateraw"
 #echo $PWSPOST
 
 RESULT=$(wget -O /dev/null --post-data=$PWSPOST https://www.pwsweather.com/pwsupdate/pwsupdate.php)
